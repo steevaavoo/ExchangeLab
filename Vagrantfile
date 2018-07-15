@@ -8,7 +8,7 @@ check_plugins ['vagrant-reload']
 # This is the default subnet for Virtualbox (not the special communications one for Vagrant>Box WinRM stuff)
 subnet_prefix         = '192.168.56'
 box_name              = 'adamrushuk/win2016-std-dev'
-box_version           = '1.0.0'
+box_version           = '0.2.1'
 dc01_ip               = "#{subnet_prefix}.110"
 dc_hostname           = 'dc01'
 # domain_name           = 'lab.milliondollar.me.uk'
@@ -21,7 +21,7 @@ ex_hostname           = 'ex01'
 ex01_ip               = "#{subnet_prefix}.112"
 # domain_admin_un       = 'vagrant'
 # domain_admin_pw       = 'vagrant'
-module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc'
+module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics'
 
 Vagrant.configure('2') do |config|
 
@@ -57,6 +57,7 @@ Vagrant.configure('2') do |config|
   config.vm.boot_timeout = 600
   config.vm.provision 'shell', path: 'Vagrant/provision/all/Install-Modules.ps1', args: [module_names]
   config.vm.provision 'shell', path: 'Vagrant/provision/all/Set-Networking.ps1'
+  config.vm.provision 'shell', path: 'Vagrant/provision/all/Environment-Setup.ps1'
 
   # The below settings are for individual VMs
   # DC
