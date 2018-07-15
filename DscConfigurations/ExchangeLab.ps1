@@ -17,7 +17,7 @@ Configuration Exchange {
 
     # Import the module that contains the resources we're using.
     Import-DscResource -ModuleName 'PsDesiredStateConfiguration', 'xExchange', 'xPendingReboot', 'xActiveDirectory',
-    'ComputerManagementDsc', 'NetworkingDsc'
+    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer'
 
     # The Node statement specifies which targets this configuration will be applied to.
     Node $AllNodes.NodeName {
@@ -42,7 +42,7 @@ Configuration Exchange {
             WindowsFeatureSet 'AD-Domain-Services'
             {
                 Ensure               = 'Present'
-                Name                 = 'AD-Domain-Services', 'RSAT-AD-PowerShell'
+                Name                 = 'AD-Domain-Services', 'RSAT-AD-PowerShell', 'RSAT-ADDS-Tools'
                 IncludeAllSubFeature = $true
             }
 
@@ -117,6 +117,24 @@ Configuration Exchange {
                     DependsOn        = $dependencyArray
                 }
             }
+
+            xDnsServerPrimaryZone 'addPrimaryZone'
+            {
+                Ensure    = 'Present'
+                Name      = $ConfigurationData.Role.Exchange.ExternalFqdn
+                DependsOn = '[WindowsFeatureSet]AD-Domain-Services'
+            }
+
+            xDnsRecord 'ExcExtFqdn'
+            {
+                Name      = '.'
+                Target    = $ConfigurationData.Role.Exchange.Ex01IP
+                Zone      = $ConfigurationData.Role.Exchange.ExternalFqdn
+                Type      = 'ARecord'
+                Ensure    = 'Present'
+                DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
+            }
+
         }
         #endregion DC
 
@@ -125,20 +143,20 @@ Configuration Exchange {
         if ($Node.Role -contains 'Exchange')
         {
 
-            # DnsServerAddress 'DnsServerAddress'
-            # {
-            #     Address        = '192.168.56.110'
-            #     InterfaceAlias = 'Ethernet 2'
-            #     AddressFamily  = 'IPv4'
-            #     Validate       = $true
-            # }
+            DnsServerAddress 'DnsServerAddress'
+            {
+                Address        = '192.168.56.110'
+                InterfaceAlias = 'Ethernet 2'
+                AddressFamily  = 'IPv4'
+                #Validate       = $true - this appears to cause an error, and the setting works without it.
+            }
 
             xWaitForADDomain 'WaitDomain'
             {
                 DomainName       = $ConfigurationData.Role.DomainController.DomainName
                 RetryCount       = 30
                 RetryIntervalSec = 60
-                #DependsOn        = '[DnsServerAddress]DnsServerAddress'
+                DependsOn        = '[DnsServerAddress]DnsServerAddress'
             }
 
             Computer 'JoinDomain'
@@ -195,13 +213,13 @@ Configuration Exchange {
             }
 
             # # Post-Exchange Configuration - AutoDiscoverURI - WIP
-            # xExchClientAccessServer CAS
-            # {
-            #     Identity                       = $Node.NodeName
-            #     Credential                     = $DomainAdminCredential
-            #     AutoDiscoverServiceInternalUri = "https://($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
-            #     AutoDiscoverSiteScope          = $casSettings.AutoDiscoverSiteScope
-            # }
+            xExchClientAccessServer CAS
+            {
+                Identity                       = $Node.NodeName
+                Credential                     = $DomainAdminCredential
+                AutoDiscoverServiceInternalUri = "https://($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
+                DependsOn  = '[xPendingReboot]AfterExchangeInstall'
+            }
 
         }
         #endregion Exchange
