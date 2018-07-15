@@ -217,7 +217,7 @@ Configuration Exchange {
             {
                 Identity                       = $Node.NodeName
                 Credential                     = $DomainAdminCredential
-                AutoDiscoverServiceInternalUri = "https://($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
+                AutoDiscoverServiceInternalUri = "https://$($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
                 DependsOn  = '[xPendingReboot]AfterExchangeInstall'
             }
 
