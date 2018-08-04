@@ -34,6 +34,7 @@
             OrganisationName = 'MillionDollarEnterprises'
             ExternalFqdn     = 'mail.milliondollar.me.uk' #Make sure to update this if you change the AD Domain name!
             Ex01IP           = '192.168.56.112'
+            DBName           = 'MDDatabase1'
         }
 
         DomainController = @{
