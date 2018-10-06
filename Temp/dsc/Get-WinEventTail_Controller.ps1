@@ -1,6 +1,6 @@
 # Get-WinEventTail testing
 # Get-WinEventTail_Controller.ps1 -ComputerName dc01 -Verbose
-# \\VBOXSVR\vagrant\Temp\DSC\Get-WinEventTail_Controller.ps1 -ComputerName dc01 -Verbose
+# \\VBOXSVR\vagrant\Temp\DSC\Get-WinEventTail_Controller.ps1 -ComputerName ex01 -Verbose
 [cmdletbinding()]
 Param(
     [Parameter(Mandatory = $true)][string]$ComputerName
