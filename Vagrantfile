@@ -7,8 +7,8 @@ check_plugins ['vagrant-reload']
 # Domain / Network
 # This is the default subnet for Virtualbox (not the special communications one for Vagrant>Box WinRM stuff)
 subnet_prefix         = '192.168.56'
-box_name              = 'adamrushuk/win2016-datacenter-dev'
-box_version           = '1807.0.0'
+box_name              = 'adamrushuk/win2016-std-dev'
+box_version           = '1809.1.0'
 dc01_ip               = "#{subnet_prefix}.110"
 dc_hostname           = 'dc01'
 # domain_name           = 'lab.milliondollar.me.uk'
