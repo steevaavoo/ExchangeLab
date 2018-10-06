@@ -19,9 +19,11 @@ fs_hostname           = 'fs01'
 fs01_ip               = "#{subnet_prefix}.111"
 ex_hostname           = 'ex01'
 ex01_ip               = "#{subnet_prefix}.112"
+adcs_hostname           = 'adcs01'
+adcs_ip               = "#{subnet_prefix}.113"
 # domain_admin_un       = 'vagrant'
 # domain_admin_pw       = 'vagrant'
-module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics'
+module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics,ActiveDirectoryCSDsc'
 
 Vagrant.configure('2') do |config|
 
@@ -132,6 +134,28 @@ Vagrant.configure('2') do |config|
 
     # Rebooting to make sure Exchange ready to be installed
     machine.vm.provision :reload
+
+  end
+
+
+  # ADCS Server
+  config.vm.define adcs_hostname do |machine|
+    # CPU and RAM
+    machine.vm.provider 'virtualbox' do |vb|
+      vb.cpus = '2'
+      vb.memory = '2048'
+    end
+
+    # Hostname and networking
+    machine.vm.hostname = adcs_hostname
+    machine.vm.network 'private_network', ip: adcs_ip
+    machine.vm.network 'forwarded_port', guest: 3389, host: 34003, auto_correct: true
+
+    # Provisioning - this calls the Scripts below on the target VM, passing the arguments (args) to their parameters (positional)
+
+    # Setting the IP Address of the File Server and Joining it to the Domain
+    # machine.vm.provision 'shell', path: 'Vagrant/provision/all/Join-Domain.ps1', args: [domain_name, domain_admin_un, domain_admin_pw, dc01_ip]
+    # machine.vm.provision :reload
 
   end
 
