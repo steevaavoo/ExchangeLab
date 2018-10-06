@@ -81,7 +81,7 @@ Configuration Exchange {
                     xADOrganizationalUnit $_
                     {
                         Ensure    = 'Present'
-                        Name      = ($_ -replace '-')
+                        Name      = $_
                         Path      = ('DC={0},DC={1},DC={2},DC={3}' -f ($DomainName -split '\.')[0], ($DomainName -split '\.')[1], ($DomainName -split '\.')[2], ($DomainName -split '\.')[3])
                         DependsOn = '[xADDomain]ADDomain'
                     }
@@ -132,6 +132,15 @@ Configuration Exchange {
                 Zone      = $ConfigurationData.Role.Exchange.ExternalFqdn
                 Type      = 'ARecord'
                 Ensure    = 'Present'
+                DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
+            }
+
+            DnsServerAddress 'DnsServerAddress'
+            {
+                Address        = '192.168.56.110', '127.0.0.1'
+                InterfaceAlias = 'Ethernet 2'
+                AddressFamily  = 'IPv4'
+                #Validate       = $true - this appears to cause an error, and the setting works without it.
                 DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
             }
 
@@ -200,7 +209,7 @@ Configuration Exchange {
             xExchInstall InstallExchange
             {
                 Path       = $ConfigurationData.Role.Exchange.BinaryPath
-                Arguments  = "/mode:Install /role:Mailbox /OrganizationName $($ConfigurationData.Role.Exchange.OrganisationName) /Iacceptexchangeserverlicenseterms /MdbName:MD-Database"
+                Arguments  = "/mode:Install /role:Mailbox /OrganizationName $($ConfigurationData.Role.Exchange.OrganisationName) /Iacceptexchangeserverlicenseterms"
                 Credential = $DomainAdminCredential
                 DependsOn  = '[xPendingReboot]BeforeExchangeInstall'
             }
@@ -217,7 +226,7 @@ Configuration Exchange {
             {
                 Identity                       = $Node.NodeName
                 Credential                     = $DomainAdminCredential
-                AutoDiscoverServiceInternalUri = "https://($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
+                AutoDiscoverServiceInternalUri = "https://$($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
                 DependsOn  = '[xPendingReboot]AfterExchangeInstall'
             }
 
