@@ -1,5 +1,5 @@
 # Variables
-$ComputerNames = 'dc01', 'ex01'
+$ComputerNames = 'dc01', 'ex01', 'adcs01'
 $ConfigurationPath = Join-Path -Path $PSScriptRoot -ChildPath '\..\DscConfigurations\ExchangeLabConfiguration.ps1'
 $ConfigurationDataPath = "$PSScriptRoot\ExchangeLabConfigData.psd1"
 $DscOutputPath = 'C:\Source\DSC\MOFs'

@@ -24,6 +24,13 @@
             # Wrap in an array for consistency
             Role     = @('Exchange')
         }
+
+        # ADCS Node
+        @{
+            NodeName = 'adcs01'
+            # Wrap in an array for consistency
+            Role     = @('ADCS')
+        }
     )
 
     # Define role data here to ensure role and node are not tightly coupled

@@ -17,7 +17,7 @@ Configuration Exchange {
 
     # Import the module that contains the resources we're using.
     Import-DscResource -ModuleName 'PsDesiredStateConfiguration', 'xExchange', 'xPendingReboot', 'xActiveDirectory',
-    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer'
+    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer', 'ActiveDirectoryCSDsc'
 
     # The Node statement specifies which targets this configuration will be applied to.
     Node $AllNodes.NodeName {
@@ -141,7 +141,7 @@ Configuration Exchange {
                 InterfaceAlias = 'Ethernet 2'
                 AddressFamily  = 'IPv4'
                 #Validate       = $true - this appears to cause an error, and the setting works without it.
-                DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
+                DependsOn      = '[xDnsServerPrimaryZone]addPrimaryZone'
             }
 
         }
@@ -227,10 +227,72 @@ Configuration Exchange {
                 Identity                       = $Node.NodeName
                 Credential                     = $DomainAdminCredential
                 AutoDiscoverServiceInternalUri = "https://$($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
-                DependsOn  = '[xPendingReboot]AfterExchangeInstall'
+                DependsOn                      = '[xPendingReboot]AfterExchangeInstall'
             }
 
         }
         #endregion Exchange
+
+
+        #region ADCS
+        if ($Node.Role -contains 'ADCS')
+        {
+            DnsServerAddress 'DnsServerAddress'
+            {
+                Address        = '192.168.56.110'
+                InterfaceAlias = 'Ethernet 2'
+                AddressFamily  = 'IPv4'
+                #Validate       = $true - this appears to cause an error, and the setting works without it.
+            }
+
+            xWaitForADDomain 'WaitDomain'
+            {
+                DomainName       = $ConfigurationData.Role.DomainController.DomainName
+                RetryCount       = 30
+                RetryIntervalSec = 60
+                DependsOn        = '[DnsServerAddress]DnsServerAddress'
+            }
+
+            Computer 'JoinDomain'
+            {
+                Name       = $Node.NodeName
+                DomainName = $ConfigurationData.Role.DomainController.DomainName
+                Credential = $DomainAdminCredential # Credential to join to domain
+                DependsOn  = '[xWaitForADDomain]WaitDomain'
+            }
+
+            WindowsFeature 'ADCS-Cert-Authority'
+            {
+                Ensure    = 'Present'
+                Name      = 'ADCS-Cert-Authority'
+                DependsOn = '[Computer]JoinDomain'
+            }
+
+            AdcsCertificationAuthority 'CertificateAuthority'
+            {
+                IsSingleInstance = 'Yes'
+                Ensure           = 'Present'
+                Credential       = $DomainAdminCredential
+                CAType           = 'EnterpriseRootCA'
+                DependsOn        = '[WindowsFeature]ADCS-Cert-Authority'
+            }
+
+            WindowsFeature 'ADCS-Web-Enrollment'
+            {
+                Ensure    = 'Present'
+                Name      = 'ADCS-Web-Enrollment'
+                DependsOn = '[AdcsCertificationAuthority]CertificateAuthority'
+            }
+
+            AdcsWebEnrollment 'WebEnrollment'
+            {
+                Ensure           = 'Present'
+                IsSingleInstance = 'Yes'
+                Credential       = $DomainAdminCredential
+                DependsOn        = '[WindowsFeature]ADCS-Web-Enrollment'
+            }
+        }
+        #endregion ADCS
+
     }
 }
