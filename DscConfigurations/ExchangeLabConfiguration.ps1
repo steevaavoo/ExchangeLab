@@ -17,7 +17,7 @@ Configuration Exchange {
 
     # Import the module that contains the resources we're using.
     Import-DscResource -ModuleName 'PsDesiredStateConfiguration', 'xExchange', 'xPendingReboot', 'xActiveDirectory',
-    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer', 'ActiveDirectoryCSDsc'
+    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer', 'ActiveDirectoryCSDsc', 'CertificateDsc'
 
     # Global Configuration Data Variables (for ease of reading inside regions)
     $DomainName = $ConfigurationData.Role.DomainController.DomainName
@@ -291,13 +291,43 @@ Configuration Exchange {
             }
 
             # # Post-Exchange Configuration - AutoDiscoverURI - WIP
-            xExchClientAccessServer CAS
+            xExchClientAccessServer 'CAS'
             {
                 Identity                       = $Node.NodeName
                 Credential                     = $DomainAdminCredential
                 AutoDiscoverServiceInternalUri = "https://$($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
                 DependsOn                      = '[xPendingReboot]AfterExchangeInstall'
             }
+
+
+            #region GeneratingCertificateRequest
+            WaitForAll 'CertServices'
+            {
+                ResourceName     = '[AdcsWebEnrollment]WebEnrollment'
+                NodeName         = 'adcs01'
+                RetryIntervalSec = 60
+                RetryCount       = 60
+                DependsOn        = '[xExchClientAccessServer]CAS'
+            }
+
+            CertReq SSLCert
+            {
+                CARootName          = 'lab-ADCS01-CA'
+                CAServerFQDN        = 'adcs01.lab.milliondollar.me.uk'
+                Subject             = $ConfigurationData.Role.Exchange.ExternalFqdn
+                KeyLength           = '2048'
+                Exportable          = $true
+                ProviderName        = '"Microsoft RSA SChannel Cryptographic Provider"'
+                OID                 = '1.3.6.1.5.5.7.3.1'
+                KeyUsage            = '0xa0'
+                CertificateTemplate = 'WebServer'
+                SubjectAltName      = 'dns=webmail.milliondollar.me.uk&dns=ex01.lab.milliondollar.me.uk'
+                AutoRenew           = $true
+                FriendlyName        = 'SSL Cert for Exchange Server'
+                Credential          = $DomainAdminCredential
+            }
+
+            #endregion GeneratingCertificateRequest
 
         }
         #endregion Exchange
@@ -359,6 +389,13 @@ Configuration Exchange {
                 IsSingleInstance = 'Yes'
                 Credential       = $DomainAdminCredential
                 DependsOn        = '[WindowsFeature]ADCS-Web-Enrollment'
+            }
+
+            WindowsFeature 'RSAT-ADCS'
+            {
+                Ensure    = 'Present'
+                Name      = 'RSAT-ADCS'
+                DependsOn = '[AdcsWebEnrollment]WebEnrollment'
             }
         }
         #endregion ADCS

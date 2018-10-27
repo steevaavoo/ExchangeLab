@@ -25,7 +25,7 @@ adcs_ip               = "#{subnet_prefix}.113"
 dc02_ip               = "#{subnet_prefix}.114"
 # domain_admin_un       = 'vagrant'
 # domain_admin_pw       = 'vagrant'
-module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics,ActiveDirectoryCSDsc'
+module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics,ActiveDirectoryCSDsc,CertificateDsc'
 
 Vagrant.configure('2') do |config|
 
