@@ -11,11 +11,18 @@
             RebootNodeIfNeeded          = $true
         }
 
-        # DC Node
+        # DC01 Node
         @{
             NodeName = 'dc01'
             # Wrap in an array for consistency
             Role     = @('DomainController')
+        }
+
+        # DC02 Node
+        @{
+            NodeName = 'dc02'
+            # Wrap in an array for consistency
+            Role     = @('DomainControllerAdditional')
         }
 
         # Exchange Node
