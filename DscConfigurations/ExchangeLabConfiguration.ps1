@@ -326,8 +326,17 @@ Configuration Exchange {
                 FriendlyName        = 'SSL Cert for Exchange Server'
                 Credential          = $DomainAdminCredential
             }
-
             #endregion GeneratingCertificateRequest
+
+            # Adding services to our Exchange Certificate
+            xExchExchangeCertificate Certificate
+            {
+                Thumbprint          = '9EED456F833E5187C67A072E6B1384019511CA91'
+                Credential          = $DomainAdminCredential
+                Ensure              = 'Present'
+                AllowExtraServices  = $false
+                Services            = $ConfigurationData.Role.Exchange.Services
+            }
 
         }
         #endregion Exchange
