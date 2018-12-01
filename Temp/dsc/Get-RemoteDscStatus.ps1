@@ -1,14 +1,19 @@
-# Variables
-$vmList = 'dc01', 'ex01', 'fs01'
+# Building VMList Dynamically
+$ConfigurationDataPath = 'D:\Code\GitHub\ExchangeLab\Examples\ExchangeLabConfigData.psd1'
+$ConfigurationData = Import-PowerShellDataFile -Path $ConfigurationDataPath
+$vmlist = $ConfigurationData.AllNodes.NodeName | Where-Object { $_ -ne "*" }
+
+# Declaring Domain Admin Credentials
 $domainAdminCredential = New-Object -TypeName 'PSCredential' -ArgumentList ('lab\vagrant', (ConvertTo-SecureString -String 'vagrant' -AsPlainText -Force))
 
 Invoke-Command -ComputerName $vmList -Credential $domainAdminCredential -Verbose -ScriptBlock {
     Get-DscLocalConfigurationManager | Select-Object LCMState, LCMStateDetail
 }
 
+break
 
 #############
-$computerName = 'dc01'
+$computerName = 'dc02'
 Invoke-Command -ComputerName $computerName -Credential $domainAdminCredential -Verbose -ScriptBlock {
     Get-DscLocalConfigurationManager
 

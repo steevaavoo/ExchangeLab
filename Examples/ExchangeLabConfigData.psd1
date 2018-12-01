@@ -11,11 +11,18 @@
             RebootNodeIfNeeded          = $true
         }
 
-        # DC Node
+        # DC01 Node
         @{
             NodeName = 'dc01'
             # Wrap in an array for consistency
             Role     = @('DomainController')
+        }
+
+        # DC02 Node
+        @{
+            NodeName = 'dc02'
+            # Wrap in an array for consistency
+            Role     = @('DomainControllerAdditional')
         }
 
         # Exchange Node
@@ -23,6 +30,13 @@
             NodeName = 'ex01'
             # Wrap in an array for consistency
             Role     = @('Exchange')
+        }
+
+        # ADCS Node
+        @{
+            NodeName = 'adcs01'
+            # Wrap in an array for consistency
+            Role     = @('ADCS')
         }
     )
 
@@ -35,6 +49,7 @@
             ExternalFqdn     = 'mail.milliondollar.me.uk' #Make sure to update this if you change the AD Domain name!
             Ex01IP           = '192.168.56.112'
             DBName           = 'MDDatabase1'
+            Services         = 'IIS', 'POP', 'IMAP', 'SMTP'
         }
 
         DomainController = @{

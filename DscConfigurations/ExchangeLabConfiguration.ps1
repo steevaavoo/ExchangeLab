@@ -17,7 +17,11 @@ Configuration Exchange {
 
     # Import the module that contains the resources we're using.
     Import-DscResource -ModuleName 'PsDesiredStateConfiguration', 'xExchange', 'xPendingReboot', 'xActiveDirectory',
-    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer'
+    'ComputerManagementDsc', 'NetworkingDsc', 'xDnsServer', 'ActiveDirectoryCSDsc', 'CertificateDsc'
+
+    # Global Configuration Data Variables (for ease of reading inside regions)
+    $DomainName = $ConfigurationData.Role.DomainController.DomainName
+
 
     # The Node statement specifies which targets this configuration will be applied to.
     Node $AllNodes.NodeName {
@@ -37,7 +41,6 @@ Configuration Exchange {
         #region DC
         if ($Node.Role -contains 'DomainController')
         {
-            $DomainName = $ConfigurationData.Role.DomainController.DomainName
 
             WindowsFeatureSet 'AD-Domain-Services'
             {
@@ -91,16 +94,17 @@ Configuration Exchange {
             @($ConfigurationData.Role.DomainController.ADUsers).foreach( {
                     xADUser $_.UserName
                     {
-                        Ensure     = 'Present'
-                        DomainName = $ConfigurationData.Role.DomainController.DomainName
-                        GivenName  = $_.FirstName
-                        SurName    = $_.LastName
-                        UserName   = $_.UserName
-                        Department = $_.Department
-                        Path       = ("OU={0},DC={1},DC={2},DC={3},DC={4}" -f $_.Department, ($DomainName -split '\.')[0], ($DomainName -split '\.')[1], ($DomainName -split '\.')[2], ($DomainName -split '\.')[3])
-                        JobTitle   = $_.Title
-                        Password   = $DSRMAdminCredential # Only uses the password part of the credential (xAdUser behaviour)
-                        DependsOn  = "[xADOrganizationalUnit]$($_.Department)"
+                        Ensure               = 'Present'
+                        DomainName           = $DomainName
+                        GivenName            = $_.FirstName
+                        SurName              = $_.LastName
+                        UserName             = $_.UserName
+                        Department           = $_.Department
+                        Path                 = ("OU={0},DC={1},DC={2},DC={3},DC={4}" -f $_.Department, ($DomainName -split '\.')[0], ($DomainName -split '\.')[1], ($DomainName -split '\.')[2], ($DomainName -split '\.')[3])
+                        JobTitle             = $_.Title
+                        Password             = $DSRMAdminCredential # Only uses the password part of the credential (xAdUser behaviour)
+                        PsDscRunAsCredential = $DomainAdminCredential
+                        DependsOn            = "[xADOrganizationalUnit]$($_.Department)"
                     }
                 }
             )
@@ -135,17 +139,82 @@ Configuration Exchange {
                 DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
             }
 
+            # DnsServerAddress 'DnsServerAddress'
+            # {
+            #     Address        = '192.168.56.110', '127.0.0.1'
+            #     InterfaceAlias = 'Ethernet 2'
+            #     AddressFamily  = 'IPv4'
+            #     #Validate       = $true - this appears to cause an error, and the setting works without it.
+            #     DependsOn      = '[xDnsServerPrimaryZone]addPrimaryZone'
+            # }
+
+            WaitForAll 'DCAdditional'
+            {
+                ResourceName     = '[xADDomainController]AdditionalDC'
+                NodeName         = 'dc02'
+                RetryIntervalSec = 60
+                RetryCount       = 60
+                DependsOn        = '[xDnsRecord]ExcExtFqdn'
+            }
+
             DnsServerAddress 'DnsServerAddress'
             {
-                Address        = '192.168.56.110', '127.0.0.1'
+                Address        = '192.168.56.114', '192.168.56.110', '127.0.0.1'
                 InterfaceAlias = 'Ethernet 2'
                 AddressFamily  = 'IPv4'
                 #Validate       = $true - this appears to cause an error, and the setting works without it.
-                DependsOn = '[xDnsServerPrimaryZone]addPrimaryZone'
+                DependsOn      = '[WaitForAll]DCAdditional'
             }
 
         }
         #endregion DC
+
+        #region DC-Additional
+        if ($Node.Role -contains 'DomainControllerAdditional')
+        {
+            WindowsFeatureSet 'AD-Domain-Services'
+            {
+                Ensure               = 'Present'
+                Name                 = 'AD-Domain-Services', 'RSAT-AD-PowerShell', 'RSAT-ADDS-Tools'
+                IncludeAllSubFeature = $true
+            }
+
+            DnsServerAddress 'DnsServerAddress'
+            {
+                Address        = '192.168.56.110', '192.168.56.114', '127.0.0.1'
+                InterfaceAlias = 'Ethernet 2'
+                AddressFamily  = 'IPv4'
+                #Validate       = $true - this appears to cause an error, and the setting works without it.
+                DependsOn      = '[WindowsFeatureSet]AD-Domain-Services'
+            }
+
+            xWaitForADDomain 'WaitDomain'
+            {
+                DomainName       = $DomainName
+                RetryCount       = 60
+                RetryIntervalSec = 60
+                DependsOn        = '[DnsServerAddress]DnsServerAddress'
+            }
+
+            Computer 'JoinDomain'
+            {
+                Name       = $Node.NodeName
+                DomainName = $DomainName
+                Credential = $DomainAdminCredential # Credential to join to domain
+                DependsOn  = '[xWaitForADDomain]WaitDomain'
+            }
+
+            xADDomainController 'AdditionalDC'
+            {
+                DomainName                    = $DomainName
+                DomainAdministratorCredential = $DomainAdminCredential
+                SafemodeAdministratorPassword = $DSRMAdminCredential
+                PsDscRunAsCredential          = $DomainAdminCredential
+                DependsOn                     = '[Computer]JoinDomain'
+            }
+
+        }
+        #endregion DC-Additional
 
 
         #region Exchange
@@ -162,8 +231,8 @@ Configuration Exchange {
 
             xWaitForADDomain 'WaitDomain'
             {
-                DomainName       = $ConfigurationData.Role.DomainController.DomainName
-                RetryCount       = 30
+                DomainName       = $DomainName
+                RetryCount       = 60
                 RetryIntervalSec = 60
                 DependsOn        = '[DnsServerAddress]DnsServerAddress'
             }
@@ -171,7 +240,7 @@ Configuration Exchange {
             Computer 'JoinDomain'
             {
                 Name       = $Node.NodeName
-                DomainName = $ConfigurationData.Role.DomainController.DomainName
+                DomainName = $DomainName
                 Credential = $DomainAdminCredential # Credential to join to domain
                 DependsOn  = '[xWaitForADDomain]WaitDomain'
             }
@@ -222,15 +291,123 @@ Configuration Exchange {
             }
 
             # # Post-Exchange Configuration - AutoDiscoverURI - WIP
-            xExchClientAccessServer CAS
+            xExchClientAccessServer 'CAS'
             {
                 Identity                       = $Node.NodeName
                 Credential                     = $DomainAdminCredential
                 AutoDiscoverServiceInternalUri = "https://$($ConfigurationData.Role.Exchange.ExternalFqdn)/autodiscover/autodiscover.xml"
-                DependsOn  = '[xPendingReboot]AfterExchangeInstall'
+                DependsOn                      = '[xPendingReboot]AfterExchangeInstall'
+            }
+
+
+            #region GeneratingCertificateRequest
+            WaitForAll 'CertServices'
+            {
+                ResourceName     = '[AdcsWebEnrollment]WebEnrollment'
+                NodeName         = 'adcs01'
+                RetryIntervalSec = 60
+                RetryCount       = 60
+                DependsOn        = '[xExchClientAccessServer]CAS'
+            }
+
+            CertReq SSLCert
+            {
+                CARootName          = 'lab-ADCS01-CA'
+                CAServerFQDN        = 'adcs01.lab.milliondollar.me.uk'
+                Subject             = $ConfigurationData.Role.Exchange.ExternalFqdn
+                KeyLength           = '2048'
+                Exportable          = $true
+                ProviderName        = '"Microsoft RSA SChannel Cryptographic Provider"'
+                OID                 = '1.3.6.1.5.5.7.3.1'
+                KeyUsage            = '0xa0'
+                CertificateTemplate = 'WebServer'
+                SubjectAltName      = 'dns=webmail.milliondollar.me.uk&dns=ex01.lab.milliondollar.me.uk'
+                AutoRenew           = $true
+                FriendlyName        = 'SSL Cert for Exchange Server'
+                Credential          = $DomainAdminCredential
+            }
+            #endregion GeneratingCertificateRequest
+
+            # Adding services to our Exchange Certificate
+            xExchExchangeCertificate Certificate
+            {
+                Thumbprint          = '9EED456F833E5187C67A072E6B1384019511CA91'
+                Credential          = $DomainAdminCredential
+                Ensure              = 'Present'
+                AllowExtraServices  = $false
+                Services            = $ConfigurationData.Role.Exchange.Services
             }
 
         }
         #endregion Exchange
+
+
+        #region ADCS
+        if ($Node.Role -contains 'ADCS')
+        {
+            DnsServerAddress 'DnsServerAddress'
+            {
+                Address        = '192.168.56.110'
+                InterfaceAlias = 'Ethernet 2'
+                AddressFamily  = 'IPv4'
+                #Validate       = $true - this appears to cause an error, and the setting works without it.
+            }
+
+            xWaitForADDomain 'WaitDomain'
+            {
+                DomainName       = $DomainName
+                RetryCount       = 30
+                RetryIntervalSec = 60
+                DependsOn        = '[DnsServerAddress]DnsServerAddress'
+            }
+
+            Computer 'JoinDomain'
+            {
+                Name       = $Node.NodeName
+                DomainName = $DomainName
+                Credential = $DomainAdminCredential # Credential to join to domain
+                DependsOn  = '[xWaitForADDomain]WaitDomain'
+            }
+
+            WindowsFeature 'ADCS-Cert-Authority'
+            {
+                Ensure    = 'Present'
+                Name      = 'ADCS-Cert-Authority'
+                DependsOn = '[Computer]JoinDomain'
+            }
+
+            AdcsCertificationAuthority 'CertificateAuthority'
+            {
+                IsSingleInstance = 'Yes'
+                Ensure           = 'Present'
+                Credential       = $DomainAdminCredential
+                CAType           = 'EnterpriseRootCA'
+                DependsOn        = '[WindowsFeature]ADCS-Cert-Authority'
+            }
+
+            WindowsFeature 'ADCS-Web-Enrollment'
+            {
+                Ensure    = 'Present'
+                Name      = 'ADCS-Web-Enrollment'
+                DependsOn = '[AdcsCertificationAuthority]CertificateAuthority'
+            }
+
+            AdcsWebEnrollment 'WebEnrollment'
+            {
+                Ensure           = 'Present'
+                IsSingleInstance = 'Yes'
+                Credential       = $DomainAdminCredential
+                DependsOn        = '[WindowsFeature]ADCS-Web-Enrollment'
+            }
+
+            WindowsFeature 'RSAT-ADCS'
+            {
+                Ensure    = 'Present'
+                Name      = 'RSAT-ADCS'
+                DependsOn = '[AdcsWebEnrollment]WebEnrollment'
+            }
+        }
+        #endregion ADCS
+
     }
 }

@@ -11,6 +11,7 @@ box_name              = 'adamrushuk/win2016-std-dev'
 box_version           = '1809.1.0'
 dc01_ip               = "#{subnet_prefix}.110"
 dc_hostname           = 'dc01'
+dc02_hostname           = 'dc02'
 # domain_name           = 'lab.milliondollar.me.uk'
 # netbios_name          = 'LAB'
 # safemode_admin_pw     = 'Passw0rds123'
@@ -19,9 +20,12 @@ fs_hostname           = 'fs01'
 fs01_ip               = "#{subnet_prefix}.111"
 ex_hostname           = 'ex01'
 ex01_ip               = "#{subnet_prefix}.112"
+adcs_hostname         = 'adcs01'
+adcs_ip               = "#{subnet_prefix}.113"
+dc02_ip               = "#{subnet_prefix}.114"
 # domain_admin_un       = 'vagrant'
 # domain_admin_pw       = 'vagrant'
-module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics'
+module_names          = 'xExchange,xPendingReboot,xActiveDirectory,ComputerManagementDsc,NetworkingDsc,xDnsServer,xDSCDiagnostics,ActiveDirectoryCSDsc,CertificateDsc'
 
 Vagrant.configure('2') do |config|
 
@@ -61,7 +65,7 @@ Vagrant.configure('2') do |config|
 
   # The below settings are for individual VMs
   # DC
-  config.vm.define 'dc01' do |machine|
+  config.vm.define dc_hostname do |machine|
     # CPU and RAM
     machine.vm.provider 'virtualbox' do |vb|
       vb.cpus = '2'
@@ -72,17 +76,21 @@ Vagrant.configure('2') do |config|
     machine.vm.hostname = dc_hostname
     machine.vm.network 'private_network', ip: dc01_ip
     machine.vm.network 'forwarded_port', guest: 3389, host: 34000, auto_correct: true
+  end
 
-    # # Provisioning - this calls the Scripts below on the target VM, passing the arguments (args) to their parameters (positional)
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/dc01/install-AD.ps1', args: [dc01_ip]
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/dc01/install-forest.ps1', args: [domain_name, netbios_name, safemode_admin_pw, dc01_ip]
-    # # Reboot after resetting DNS (as we suppresses reboot using Install-ADDSForest)
-    # machine.vm.provision :reload
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/dc01/AD-Groups-Users.ps1', args: [domain_admins, domain_name, dc_hostname]
 
-    # # Sleep due to DC configuring computer after reboot for ~8 mins
-    # machine.vm.provision 'shell', inline: 'Start-Sleep -Seconds 480'
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/dc01/configure-AD.ps1', args: [domain_name, dc_hostname]
+  # DC 2
+  config.vm.define dc02_hostname do |machine|
+    # CPU and RAM
+    machine.vm.provider 'virtualbox' do |vb|
+      vb.cpus = '2'
+      vb.memory = '2048'
+    end
+
+    # Hostname and networking
+    machine.vm.hostname = dc02_hostname
+    machine.vm.network 'private_network', ip: dc02_ip
+    machine.vm.network 'forwarded_port', guest: 3389, host: 34004, auto_correct: true
   end
 
 
@@ -98,13 +106,6 @@ Vagrant.configure('2') do |config|
     machine.vm.hostname = fs_hostname
     machine.vm.network 'private_network', ip: fs01_ip
     machine.vm.network 'forwarded_port', guest: 3389, host: 34001, auto_correct: true
-
-    # Provisioning - this calls the Scripts below on the target VM, passing the arguments (args) to their parameters (positional)
-
-    # Setting the IP Address of the File Server and Joining it to the Domain
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/all/Join-Domain.ps1', args: [domain_name, domain_admin_un, domain_admin_pw, dc01_ip]
-    # machine.vm.provision :reload
-
   end
 
 
@@ -121,18 +122,26 @@ Vagrant.configure('2') do |config|
     machine.vm.network 'private_network', ip: ex01_ip
     machine.vm.network 'forwarded_port', guest: 3389, host: 34002, auto_correct: true
 
-    # Provisioning - this calls the Scripts below on the target VM, passing the arguments (args) to their parameters (positional)
-
-    # Setting the IP Address of the File Server and Joining it to the Domain
-    # machine.vm.provision 'shell', path: 'Vagrant/provision/all/Join-Domain.ps1', args: [domain_name, domain_admin_un, domain_admin_pw, dc01_ip]
-    # machine.vm.provision :reload
-
     # Staging Installers
     machine.vm.provision 'shell', path: 'Vagrant/provision/ex01/stage-Installers.ps1'
 
     # Rebooting to make sure Exchange ready to be installed
     machine.vm.provision :reload
+  end
 
+
+  # ADCS Server
+  config.vm.define adcs_hostname do |machine|
+    # CPU and RAM
+    machine.vm.provider 'virtualbox' do |vb|
+      vb.cpus = '2'
+      vb.memory = '2048'
+    end
+
+    # Hostname and networking
+    machine.vm.hostname = adcs_hostname
+    machine.vm.network 'private_network', ip: adcs_ip
+    machine.vm.network 'forwarded_port', guest: 3389, host: 34003, auto_correct: true
   end
 
 end

@@ -1,8 +1,12 @@
 # Variables
-$ComputerNames = 'dc01', 'ex01'
+
 $ConfigurationPath = Join-Path -Path $PSScriptRoot -ChildPath '\..\DscConfigurations\ExchangeLabConfiguration.ps1'
 $ConfigurationDataPath = "$PSScriptRoot\ExchangeLabConfigData.psd1"
+$ConfigurationData = Import-PowerShellDataFile -Path $ConfigurationDataPath
+$ComputerNames = $ConfigurationData.AllNodes.NodeName | Where-Object { $_ -ne "*" }
+# $ComputerNames = 'ex01', 'fs01', 'dc01'
 $DscOutputPath = 'C:\Source\DSC\MOFs'
+
 # Credentials
 $DomainAdminCredential = New-Object -TypeName 'PSCredential' -ArgumentList ('LAB\vagrant', (ConvertTo-SecureString -String 'vagrant' -AsPlainText -Force))
 $DSRMAdminCredential = New-Object -TypeName 'PSCredential' -ArgumentList ('LAB\vagrant', (ConvertTo-SecureString -String 'P@ssw0rd!"£' -AsPlainText -Force))
